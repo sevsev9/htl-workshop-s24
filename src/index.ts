@@ -1,9 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import mongoose from 'mongoose';
 
 import envUtil from './util/env.util';
 import router from './routes';
-
 
 const app = express();
 
@@ -13,6 +13,10 @@ app.use(cors());
 
 app.use("/", router)
 
-app.listen(envUtil.PORT, () => {
+app.listen(envUtil.PORT, async () => {
     console.log('Server started.');
+    
+    await mongoose.connect(envUtil.MONGO_URL);
+
+    console.log('Connected to MongoDB.');
 });
