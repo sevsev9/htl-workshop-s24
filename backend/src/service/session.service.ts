@@ -108,3 +108,21 @@ export async function reIssueAccessToken(refresToken: string): Promise<{ error: 
         return { jwt: false, error: 'Error re-issuing access token' };
     }
 }
+
+export async function invalidateSession(sessionId: SessionDocument['_id']): Promise<void> {
+    try {
+        await SessionModel.findByIdAndUpdate(sessionId, { valid: false});
+        logger.debug(`{Session Service | Invalidate Session} - Session ${sessionId} invalidated`);
+    } catch (err) {
+        logger.error(`{Session Service | Invalidate Session} - Error: ${err}`);
+        throw new ApplicationError('Error invalidating session', ErrorCode.DATABASE_ERROR);
+    }
+}
+
+export async function invalidateAllSessionsForUser(userId: UserDocument['_id']): Promise<number> {
+    const sessions = await SessionModel.updateMany({userId, valid: true}, { valid: false });
+
+    logger.debug(`{Session Service | Invalidate All Sessions For User} - Invalidated ${sessions.modifiedCount} sessions for user ${userId}`);
+
+    return sessions.modifiedCount;
+}
