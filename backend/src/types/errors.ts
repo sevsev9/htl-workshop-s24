@@ -17,6 +17,25 @@ export enum ErrorCode {
     INVALID_INPUT = "INVALID_INPUT"
 }
 
+const errorMap = new Map<ErrorCode, number>([
+    [ErrorCode.USER_NOT_FOUND, 404],
+    [ErrorCode.VALIDATION_ERROR, 400],
+    [ErrorCode.PERMISSION_DENIED, 403],
+    [ErrorCode.ITEM_NOT_FOUND, 404],
+    [ErrorCode.DATABASE_ERROR, 500],
+    [ErrorCode.UNAUTHORIZED, 401],
+    [ErrorCode.FORBIDDEN, 403],
+    [ErrorCode.BAD_REQUEST, 400],
+    [ErrorCode.DUPLICATE_ENTRY, 409],
+    [ErrorCode.INTERNAL_SERVER_ERROR, 500],
+    [ErrorCode.NOT_IMPLEMENTED, 501],
+    [ErrorCode.SERVICE_UNAVAILABLE, 503],
+    [ErrorCode.TIMEOUT, 504],
+    [ErrorCode.INVALID_PASSWORD, 400],
+    [ErrorCode.NO_PASSWORD_STORED, 400],
+    [ErrorCode.INVALID_INPUT, 400]
+]);
+
 export class ApplicationError extends Error {
     errorCode: ErrorCode;
 
@@ -24,5 +43,9 @@ export class ApplicationError extends Error {
         super(message);
         this.errorCode = statusCode;
         Error.captureStackTrace(this, this.constructor);
+    }
+
+    getHttpCode() {
+        errorMap.get(this.errorCode);
     }
 }
