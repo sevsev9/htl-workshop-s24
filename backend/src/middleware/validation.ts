@@ -21,7 +21,8 @@ export const validate = (schema: AnyZodObject) => {
             next();
         } else {
             res.status(400).json({
-                error: "Malformed body"
+                error: "Malformed body",
+                message: validated.error.errors
             })
         }
     }

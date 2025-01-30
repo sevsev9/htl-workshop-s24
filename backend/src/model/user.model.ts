@@ -13,7 +13,25 @@ export const UserSchema = new Schema<UserDocument>({
     email: { type: String, unique: true, required: true },
     password: { type: String, required: true }
 }, {
-    timestamps: true
+    timestamps: true,
+    toJSON: {
+        virtuals: true,
+        transform: (_, ret) => {
+            ret.id = ret._id.toString();
+            delete ret._id;
+            delete ret.__v;
+            delete ret.password;
+        }
+    },
+    toObject: {
+        virtuals: true,
+        transform: (_, ret) => {
+            ret.id = ret._id.toString();
+            delete ret._id;
+            delete ret.__v;
+            delete ret.password;
+        }
+    }
 });
 
 export const UserModel = model<UserDocument>("User", UserSchema);

@@ -1,5 +1,4 @@
 import type { Request, Response } from "express";
-import { pick } from "lodash";
 
 import { createUser, getUser } from "../service/user.service";
 import { CreateUserInput, GetUserInput } from "../schema/user.schema";
@@ -12,9 +11,7 @@ export async function createUserHandler(
     try {
         const user = await createUser(req.body);
 
-        return res.status(200).json(
-            pick(user, "username", "email", "_id")
-        );
+        return res.status(200).json(user);
     } catch (e) {
         console.log(e);
         return res.status(400).send(e);
@@ -28,9 +25,7 @@ export async function getUserHandler(
     try {
         const user = await getUser(req.params.id);
 
-        return res.status(200).json(
-            pick(user, "_id", "username", "email")
-        );
+        return res.status(200).json(user);
     } catch (e) {
         return res.status(404).json({
             message: "User not found",
