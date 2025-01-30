@@ -46,6 +46,6 @@ export class ApplicationError extends Error {
     }
 
     getHttpCode() {
-        return errorMap.get(this.errorCode);
+        return errorMap.get(this.errorCode) || 500;
     }
 }
