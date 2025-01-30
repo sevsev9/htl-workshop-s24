@@ -1,4 +1,5 @@
 import { User, UserModel } from "../model/user.model";
+import logger from "../util/logger.util";
 
 
 export async function createUser(
@@ -7,11 +8,11 @@ export async function createUser(
     try {
         const userDocument = await UserModel.create(user);
 
-        console.log("{User Service | Create User} - Successfully created user with id: " + userDocument._id);
+        logger.info("{User Service | Create User} - Successfully created user with id: " + userDocument._id);
 
         return userDocument;
     } catch(e) {
-        console.error(e);
+        logger.error(e);
         throw e;
     }
 }
@@ -28,7 +29,7 @@ export async function getUser(
 
         return user;
     } catch(e) {
-        console.error(`{User Service | Get User} - Error getting user: ${e}`);
+        logger.error(`{User Service | Get User} - Error getting user: ${e}`);
         throw e;
     }
 }

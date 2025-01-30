@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 
 import { createUser, getUser } from "../service/user.service";
 import { CreateUserInput, GetUserInput } from "../schema/user.schema";
+import logger from "../util/logger.util";
 
 
 export async function createUserHandler(
@@ -13,7 +14,7 @@ export async function createUserHandler(
 
         return res.status(200).json(user);
     } catch (e) {
-        console.log(e);
+        logger.error(e);
         return res.status(400).send(e);
     }
 }
