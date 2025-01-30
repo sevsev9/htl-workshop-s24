@@ -1,6 +1,6 @@
-## Leson Two
+# Leson Two
 
-### Implementing JWT Auth
+## Contents of this Lesson
 
 - [ ] CORS util
 - [ ] Logging w/ pino
@@ -13,7 +13,9 @@
   - [ ] JWT Types
 - [ ] Deserialize User Middleware
 
-#### Adding Pino
+## 1. Adding Pino
+
+Pino is a library that allows us to have better logging in our backend application.
 
 ```bash
 npm install pino dayjs pino-pretty lodash
@@ -53,9 +55,16 @@ logger.error("...");
 LOG_LEVEL: string().default("info").refine(e => ["trace", "debug", "info", "warn", "error", "fatal"].includes(e), "LOG_LEVEL must be one of trace, debug, info, warn, error, fatal"),
 ```
 
-#### Adding CORS
+## 2. Adding CORS
 
-What is CORS?
+### 2.1 What is CORS
+
+**Cross-Origin Resource Sharing** is a browser security feature that controls how resources on a web page can be requested from a different origin.
+
+- The `cors` package simplifies the configuration by handling the headers of every request according to the configuration set at the start
+- Automatically handles preflight checks done by browsers (`HTTP OPTIONS`)
+
+### 2.2 How do we implement it?
 
 ```bash
 npm install cors
@@ -84,7 +93,7 @@ app.use(cors);
 // ...
 ```
 
-#### Adding Error Types
+## 3. Adding Error Types
 
 ```typescript
 // types/errors.ts
@@ -119,9 +128,9 @@ export class ApplicationError extends Error {
 ```
 
 
-#### Adding JWT
+## 4. Adding JWT
 
-##### How does JWT Auth Work?
+### 4.1 How does JWT Auth Work?
 
 - JWT = JSON Web Token
   - Effectively a signed JSON Document
@@ -162,7 +171,14 @@ Our approach here:
 - Check validity of the Refresh Token in the database
   - A logout invalidates the token in the database and disallows reaquiring a access token based on this refresh token.
 
-##### JWT Types
+### 4.2 Installing Packages
+
+```bash
+npm install jsonwebtoken bcrypt
+npm install -D @types/jsonwebtoken
+```
+
+### 4.3 JWT Types
 
 ```typescript
 export type UserJwtPayload = {
@@ -181,7 +197,7 @@ export type VerifyJwtResult = {
 }
 ```
 
-##### Express Namespace Expansion
+### 4.4 Express Namespace Expansion
 
 Why do we need it?
 How do we do it?
@@ -213,7 +229,83 @@ async function handleRequest(req: Request, res: Response) {
 }
 ```
 
-##### JWT Util
+### 4.5 JWT Relevant Env Variables
+
+*How do we configure our service?*
+
+```typescript
+import { object, coerce, string } from "zod";
+import { config } from "dotenv";
+
+config();
+
+const envSchema = object({
+  PORT: coerce
+    .number({
+      message: "Port must be a number",
+    })
+    .min(0)
+    .max(65536),
+  MONGO_URL: string({
+    message: "MongoDB URL is required!",
+  }),
+  SALT_WORK_FACTOR: coerce
+    .number({
+      message: "SALT_WORK_FACTOR must be a number",
+    })
+    .min(4)
+    .max(31),
+
+  // the number of seconds the access token is valid for
+  ACCESS_TOKEN_TTL: coerce
+    .number({
+      message: "ACCESS_TOKEN_TTL must be a number",
+    })
+    .min(60) // 1m minimum
+    .default(900), // 15m default
+
+  // the number of seconds the refresh token is valid for
+  REFRESH_TOKEN_TTL: coerce
+    .number({
+        message: "REFRESH_TOKEN_TTL must be a number",
+    })
+    .min(3600) // 1h minimum
+    .default(604800), // 7d default
+  PRIVATE_KEY_FILE: string({
+    required_error: "PRIVATE_KEY_FILE is required.",
+  }),
+  PUBLIC_KEY_FILE: string({
+    required_error: "PUBLIC_KEY_FILE is required.",
+  }),
+  LOG_LEVEL: string()
+    .default("info")
+    .refine(
+      (e) => ["trace", "debug", "info", "warn", "error", "fatal"].includes(e),
+      "LOG_LEVEL must be one of trace, debug, info, warn, error, fatal"
+    ),
+});
+
+export default envSchema.parse(process.env);
+```
+
+- Salt Work Factor, aka cost factor or log rounds
+  - How many rounds of hashing will be done on the password
+  - typically between 4 and 31
+  - 10 = 2^10 = 1024 iterations of hashing
+  - 12 = 2^12 = 4096 iterations of hashing
+- Access Token TTL
+  - TTL = Time To Live
+    - How long the access token stays valid
+- Refresh Token TTL
+  - What could that be?
+- Private Key File
+  - The file containing the private key for sigining the JWTs
+- Public Key File
+  - The file containing the public key for verifying the JWTs
+
+*One might now ask, how do we get a RSA Keypair?*
+
+### 4.6 JWT Util
 
 ```typescript
 // util/jwt.util.ts
@@ -272,10 +364,11 @@ export function verifyJwt(token: string): VerifyJwtResult {
 }
 ```
 
-##### Session Model
+### 4.7 Session Model
 
 
 ```typescript
+// model/session.model.ts
 import mongoose from "mongoose";
 import { UserDocument } from "./user.model";
 
@@ -322,7 +415,9 @@ const SessionModel = mongoose.model<SessionDocument>("Session", sessionSchema);
 export default SessionModel;
 ```
 
-##### Handler Type
+### 4.8 Handler Type
+
+@[christian](https://github.com/Christian-Hoeller) what the name of typescript is this magic?
 
 ```typescript
 // types/handler.types.ts
@@ -344,14 +439,14 @@ export type CustomSchemaExpressHandler<
         | undefined;
 ```
 
-##### Session Service
+### 4.9 Session Service
 
 ```typescript
 // service/session.service.ts
 import { Types } from "mongoose";
 import Session, { SessionDocument } from "../model/session.model";
 import { signJwt, verifyJwt } from "../util/jwt.util";
-import { findUserById } from "./user.service";
+import { getUser } from "./user.service";
 import SessionModel from "../model/session.model";
 import logger from "../util/logger.util";
 import { UserDocument } from "../model/user.model";
@@ -372,6 +467,44 @@ export async function createSession(userId: string, userAgent: string) {
 }
 ```
 
+*How does the user log in?*
+
+**Creating a pair of Tokens:**
+
+```typescript
+/**
+ * Creates a pair of access and refresh tokens for a given user.
+ *
+ * @param user The user to create the tokens for.
+ *
+ * @returns An object containing the access and refresh tokens.
+ */
+export async function issueTokens(
+  user: UserDocument,
+  userAgent: string
+): Promise<{ accessToken: string; refreshToken: string }> {
+  const session = await createSession(user._id.toString(), userAgent);
+
+  const userInfo = {
+    _id: user._id.toString(),
+    email: user.email,
+    sessionId: session._id,
+  };
+
+  // create new access JWT
+  const accessToken = signJwt(userInfo as UserJwtPayload, {
+    expiresIn: env.ACCESS_TOKEN_TTL,
+  });
+
+  // create new refresh JWT
+  const refreshToken = signJwt(userInfo as UserJwtPayload, {
+    expiresIn: env.REFRESH_TOKEN_TTL,
+  });
+
+  return { accessToken, refreshToken };
+}
+```
+
 *What do we do now if a user comes to us with a token when using our services?*
 
 **Validate a Given Session:**
@@ -385,7 +518,7 @@ export async function createSession(userId: string, userAgent: string) {
  */
 export async function validateSessionWithId(id: Types.ObjectId) {
     try {
-        const session = await findSessionById(id);
+        const session = await SessionModel.findById(id);
         return session !== null && session.valid;
     } catch (e) {
         throw new Error(`Failed to validate session: ${(e as Error).message}`);
@@ -479,9 +612,11 @@ export async function invalidateAllSessionsForUser(userId: UserDocument["_id"]):
 }
 ```
 
-##### Validate User Credentials
 
-To allow a user to log in with a given e-mail and password, we need to actually check if the given information matches the information in our database.
+*What if a user now wants to log in with his credentials?*
+
+**Validate User Credentials**
+
 
 ```typescript
 /**
@@ -522,9 +657,11 @@ export async function validateUserCredentials(email: string, password: string) {
 ```
 
 
-##### Session Controller
+### 4.10 Session Controller
 
 Handles the session logic from our service.
+
+To allow a user to log in with a given e-mail and password, we need to actually check if the given information matches the information in our database.
 
 ```typescript
 // controller/session.controller.ts
@@ -663,7 +800,7 @@ export async function logoutHandler(
 
 *But wait, how will we know in the requests if the user is logged in?*
 
-##### Deserializing the JWT in the requests
+### 4.12 Deserializing the JWT in the requests
 
 ```typescript
 // middleware/deserializeUser.ts
@@ -717,29 +854,31 @@ export async function deserializeUser(req: Request, res: Response, next: NextFun
 
 *What if the user is logged in and tries to log in again?*
 
-##### Logged In Middleware
+### 4.13 Logged In Middleware
 
 ```typescript
 // middleware/loggedInRedirect.ts
 import { NextFunction, Request, Response } from "express";
-import { verifyJwt } from "../util/jwt.util";
 import logger from "../util/logger.util";
 
 export function loggedInRedirect(req: Request, res: Response, next: NextFunction) {
     if (res.locals.user) {
-        loggerUtil.debug(`Logged in user tried to go to login/signup page | sid:${res.locals.user.sessionId}`);
+        logger.debug(`Logged in user tried to go to login/signup page | sid:${res.locals.user.sessionId}`);
         return res.redirect('/');
     }
 
     next();
 }
+
+export default loggedInRedirect;
 ```
 
 *What if we have a user that strictly requires a user to be logged in?*
 
-##### Require User Middleware
+### 4.14 Require User Middleware
 
 ```typescript
+// middleware/requireUser.ts
 import { NextFunction, Response, Request } from "express";
 
 const requireUser = (req: Request, res: Response, next: NextFunction) => {
@@ -757,46 +896,7 @@ const requireUser = (req: Request, res: Response, next: NextFunction) => {
 export default requireUser;
 ```
 
-##### JWT Relevant Env Variables
-
-*How do we configure our service?*
-
-```typescript
-SALT_WORK_FACTOR: string({
-    required_error: "SALT_WORK_FACTOR is required."
-}).refine(e => parseInt(e) > 0, "Salt work factor must be greater than 0"),
-ACCESS_TOKEN_TTL: string({
-    required_error: "ACCESS_TOKEN_TTL is required."
-}),
-REFRESH_TOKEN_TTL: string({
-    required_error: "REFRESH_TOKEN_TTL is required."
-}),
-PRIVATE_KEY_FILE: string({
-    required_error: "PRIVATE_KEY_FILE is required."
-}),
-PUBLIC_KEY_FILE: string({
-    required_error: "PUBLIC_KEY_FILE is required."
-}),
-```
-
-- Salt Work Factor, aka cost factor or log rounds
-  - How many rounds of hashing will be done on the password
-  - typically between 4 and 31
-  - 10 = 2^10 = 1024 iterations of hashing
-  - 12 = 2^12 = 4096 iterations of hashing
-- Access Token TTL
-  - TTL = Time To Live
-    - How long the access token stays valid
-- Refresh Token TTL
-  - What could that be?
-- Private Key File
-  - The file containing the private key for sigining the JWTs
-- Public Key File
-  - The file containing the public key for verifying the JWTs
-
-*One might now ask, how do we get a RSA Keypair?*
-
-##### Generating a RSA Keypair
+### 4.15 Generating a RSA Keypair
 
 ```bash
 # gen-keys.sh
@@ -809,7 +909,7 @@ openssl rsa -pubout -in rsa/private.key -out rsa/public.key
 sudo chmod +x ./gen-keys.sh
 ```
 
-##### Session Router
+### 4.16 Session Router
 
 ```typescript
 import { Request, Response, NextFunction, Router } from "express";
