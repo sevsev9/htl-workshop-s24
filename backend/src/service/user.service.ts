@@ -2,13 +2,19 @@ import bcrypt from "bcrypt";
 import { User, UserModel } from "../model/user.model";
 import { ApplicationError, ErrorCode } from "../types/errors";
 import logger from "../util/logger.util";
+import env from "../util/env.util";
 
 
 export async function createUser(
     user: User
 ) {
     try {
-        const userDocument = await UserModel.create(user);
+        let saltedPassword = await bcrypt.hash(user.password, env.SALT_WORK_FACTOR);
+
+        const userDocument = await UserModel.create({
+            ...user,
+            password: saltedPassword
+        });
 
         logger.info("{User Service | Create User} - Successfully created user with id: " + userDocument._id);
 

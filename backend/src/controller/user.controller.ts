@@ -1,14 +1,15 @@
 import type { Request, Response } from "express";
 
 import { createUser, getUser } from "../service/user.service";
-import { CreateUserInput, GetUserInput } from "../schema/user.schema";
+import { CreateUserInput } from "../schema/user.schema";
 import logger from "../util/logger.util";
+import { ApplicationError, ErrorCode } from "../types/errors";
 
 
 export async function createUserHandler(
     req: Request<{}, {}, CreateUserInput["body"]>,
     res: Response
-) {
+) {    
     try {
         const user = await createUser(req.body);
 
@@ -20,11 +21,13 @@ export async function createUserHandler(
 }
 
 export async function getUserHandler(
-    req: Request<GetUserInput["params"]>,
+    req: Request,
     res: Response
 ) {
     try {
-        const user = await getUser(req.params.id);
+        const id = res.locals.user.id;
+
+        const user = await getUser(id);
 
         return res.status(200).json(user);
     } catch (e) {

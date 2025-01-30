@@ -6,6 +6,7 @@ import env from './util/env.util';
 import router from './routes';
 import logger from "./util/logger.util";
 import cors from './util/cors.util';
+import errorHandler from './middleware/errorHandler';
 
 const app = express();
 
@@ -14,6 +15,8 @@ app.use(express.json());
 app.use(cors);
 
 app.use("/api", router);
+
+app.use(errorHandler);
 
 app.listen(env.PORT, async () => {
     logger.info('Server started.');

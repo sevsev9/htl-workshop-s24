@@ -73,12 +73,12 @@ export async function validateSessionWithId(id: Types.ObjectId) {
  * @param refreshToken The refresh token to verify.
  * @returns A new access token or an error message.
  */
-export async function reIssueAccessToken(refresToken: string): Promise<{ error: string | false, jwt: string | false}> {
+export async function reIssueAccessToken(refresToken: string): Promise<string> {
     const { decoded, valid, error } = verifyJwt(refresToken);
 
     if (!valid || !decoded) {
         logger.warn(`{Session Service | Re-Issue Access Token} - Refresh token verification failed: ${error}`);
-        return { jwt: false, error: 'Invalid refresh token' };
+        throw new ApplicationError("Invalid refresh token", ErrorCode.UNAUTHORIZED);
     }
 
     try {
@@ -86,14 +86,14 @@ export async function reIssueAccessToken(refresToken: string): Promise<{ error: 
 
         if (!session || !session.valid) {
             logger.warn(`{Session Service | Re-Issue Access Token} - Session ${decoded.sessionId} invalid or not found`);
-            return { jwt: false, error: 'Invalid session' };
+            throw new ApplicationError("Invalid Session", ErrorCode.UNAUTHORIZED);
         }
 
         const user = await getUser(session.userId.toString());
 
         if (!user) {
             logger.warn(`{Session Service | Re-Issue Access Token} - User ${session.userId} not found`);
-            return { jwt: false, error: 'User not found' };
+            throw new ApplicationError("User not found!", ErrorCode.USER_NOT_FOUND);
         }
 
         const accessToken = signJwt({
@@ -102,14 +102,18 @@ export async function reIssueAccessToken(refresToken: string): Promise<{ error: 
             sessionId: session.id
         }, { expiresIn: env.ACCESS_TOKEN_TTL });
 
-        return { jwt: accessToken, error: false };
+        return accessToken;
     } catch (err) {
+        if (err instanceof ApplicationError) {
+            throw err;
+        }
+
         logger.error(`{Session Service | Re-Issue Access Token} - Error: ${err}`);
-        return { jwt: false, error: 'Error re-issuing access token' };
+        throw new ApplicationError("Error re-issuing access token!", ErrorCode.INTERNAL_SERVER_ERROR);
     }
 }
 
-export async function invalidateSession(sessionId: SessionDocument['_id']): Promise<void> {
+export async function invalidateSession(sessionId: string): Promise<void> {
     try {
         await SessionModel.findByIdAndUpdate(sessionId, { valid: false});
         logger.debug(`{Session Service | Invalidate Session} - Session ${sessionId} invalidated`);
@@ -119,7 +123,7 @@ export async function invalidateSession(sessionId: SessionDocument['_id']): Prom
     }
 }
 
-export async function invalidateAllSessionsForUser(userId: UserDocument['_id']): Promise<number> {
+export async function invalidateAllSessionsForUser(userId: string): Promise<number> {
     const sessions = await SessionModel.updateMany({userId, valid: true}, { valid: false });
 
     logger.debug(`{Session Service | Invalidate All Sessions For User} - Invalidated ${sessions.modifiedCount} sessions for user ${userId}`);
