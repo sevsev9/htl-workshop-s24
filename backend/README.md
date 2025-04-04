@@ -2,24 +2,24 @@
 
 ## Contents of this Lesson
 
-- [ ] CORS util
 - [ ] Logging w/ pino
-- [ ] Session Model
+- [ ] CORS util
 - [ ] Types
   - [ ] Error Types
   - [ ] Express Type Expansion
   - [ ] Handler Types
 - [ ] JWT Util
+  - [ ] Session Model
   - [ ] JWT Types
-- [ ] Deserialize User Middleware
+  - [ ] Deserialize User Middleware
+- [ ] TicTacToe Game w/ HTTP Webhooks
 
 ## 1. Adding Pino
 
 Pino is a library that allows us to have better logging in our backend application.
 
 ```bash
-npm install pino dayjs pino-pretty lodash
-npm install -D @types/lodash
+npm install pino dayjs pino-pretty
 ```
 
 ```typescript
@@ -304,6 +304,8 @@ export default envSchema.parse(process.env);
   - The file containing the public key for verifying the JWTs
 
 *One might now ask, how do we get a RSA Keypair?*
+
+`./gen-keys.sh`
 
 ### 4.6 JWT Util
 
